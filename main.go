@@ -13,9 +13,6 @@ import (
 )
 
 func main() {
-	// if err := godotenv.Load(constant.DotEnvFilePath); err != nil {
-	// 	panic(fmt.Errorf("failed to load .env file: %w", err))
-	// }
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8000" //localhost
@@ -23,7 +20,7 @@ func main() {
 
 	dbConn, err := db.Init(port)
 	if err != nil {
-		fmt.Println("Failed to initialize DB:", err)
+		err := fmt.Errorf("failed to initialize DB: %w", err)
 		panic(err)
 	}
 	defer dbConn.Close()
