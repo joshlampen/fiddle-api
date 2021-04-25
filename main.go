@@ -6,18 +6,16 @@ import (
 	"os"
 
 	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 
 	"github.com/JoshLampen/fiddle/api/db"
-	"github.com/JoshLampen/fiddle/api/internal/constant"
 	"github.com/JoshLampen/fiddle/api/internal/handler"
 )
 
 func main() {
-	if err := godotenv.Load(constant.DotEnvFilePath); err != nil {
-		panic(fmt.Errorf("failed to load .env file: %w", err))
-	}
+	// if err := godotenv.Load(constant.DotEnvFilePath); err != nil {
+	// 	panic(fmt.Errorf("failed to load .env file: %w", err))
+	// }
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8000" //localhost
