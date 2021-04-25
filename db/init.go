@@ -5,18 +5,21 @@ import (
 	"os"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/joho/godotenv"
 
 	"github.com/JoshLampen/fiddle/api/internal/constant"
 )
 
 // Initialize the database connection
-func Init() (*sqlx.DB, error) {
-	if err := godotenv.Load(constant.DotEnvFilePath); err != nil {
-		return nil, fmt.Errorf("db.Init - Failed to load .env file: %w", err)
+func Init(port string) (*sqlx.DB, error) {
+	var connString string
+	if port == "8000" {
+		connString = os.Getenv(constant.EnvVarDBConnectionInfo) //local db
+	} else {
+		connString = os.Getenv(constant.EnvVarDatabaseURL) // heroku db
 	}
-	psqlInfo := os.Getenv(constant.EnvVarDBConnectionInfo)
-	db, err := sqlx.Open("postgres", psqlInfo)
+		
+	// connString := os.Getenv(constant.EnvVarDBConnectionInfo) //local db
+	db, err := sqlx.Open("postgres", connString)
 	if err != nil {
 		return nil, fmt.Errorf("db.Init - Failed to open database: %w", err)
 	}

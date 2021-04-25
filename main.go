@@ -3,16 +3,27 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 
 	"github.com/JoshLampen/fiddle/api/db"
+	"github.com/JoshLampen/fiddle/api/internal/constant"
 	"github.com/JoshLampen/fiddle/api/internal/handler"
 )
 
 func main() {
-	dbConn, err := db.Init()
+	if err := godotenv.Load(constant.DotEnvFilePath); err != nil {
+		panic(fmt.Errorf("failed to load .env file: %w", err))
+	}
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8000" //localhost
+	}
+
+	dbConn, err := db.Init(port)
 	if err != nil {
 		fmt.Println("Failed to initialize DB:", err)
 		panic(err)
@@ -31,5 +42,5 @@ func main() {
 	r.HandleFunc("/tracks", func(w http.ResponseWriter, r *http.Request) { handler.TracksSearch(w, r, store) }).Methods("GET", "OPTIONS")
 	r.HandleFunc("/tracks", func(w http.ResponseWriter, r *http.Request) { handler.TracksCreate(w, r, store) }).Methods("POST", "OPTIONS")
 
-	http.ListenAndServe(":8080", r)
+	http.ListenAndServe(":" + port, r)
 }
