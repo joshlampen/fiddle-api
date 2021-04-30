@@ -15,7 +15,7 @@ import (
 func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8000" //localhost
+		port = "8001" // localhost
 	}
 
 	dbConn, err := db.Init(port)

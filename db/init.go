@@ -12,7 +12,7 @@ import (
 // Initialize the database connection
 func Init(port string) (*sqlx.DB, error) {
 	var connString string
-	if port == "8000" {
+	if port == "8001" {
 		if err := godotenv.Load(constant.DotEnvFilePath); err != nil {
 			return nil, err
 		}
@@ -21,7 +21,6 @@ func Init(port string) (*sqlx.DB, error) {
 		connString = os.Getenv(constant.EnvVarDatabaseURL) // heroku db
 	}
 		
-	// connString := os.Getenv(constant.EnvVarDBConnectionInfo) //local db
 	db, err := sqlx.Open("postgres", connString)
 	if err != nil {
 		return nil, err
