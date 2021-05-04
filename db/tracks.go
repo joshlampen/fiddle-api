@@ -24,15 +24,13 @@ type TracksSearchParams struct {
 
 func (p TracksSearchParams) String() string {
     fields := []string {
-        "tracks.id as id",
-        "tracks.name as name",
-        "tracks.duration as duration",
-        "tracks.spotify_uri as spotify_uri",
-        "tracks.spotify_url as spotify_url",
-        "tracks.artists_json as artists_json",
-        "tracks.album_json as album_json",
-        "playlists.name as playlist_name",
-        "playlists.spotify_url as playlist_spotify_url",
+        "t.id AS id",
+        "t.name AS name",
+        "t.duration AS duration",
+        "t.spotify_uri AS spotify_uri",
+        "t.spotify_url AS spotify_url",
+        "t.artists_json AS artists_json",
+        "t.album_json AS album_json",
     }
 
     var filters []string
@@ -40,12 +38,35 @@ func (p TracksSearchParams) String() string {
         filters = append(filters, `playlists.user_id = :user_id`)
     }
 
-    q := `SELECT ` + strings.Join(fields, ", ") + `
-            FROM tracks
-            INNER JOIN playlists_tracks on playlists_tracks.track_id = tracks.id
-            INNER JOIN playlists on playlists.id = playlists_tracks.playlist_id
+    q := `SELECT ` + strings.Join(fields, ", ") + `,
+            (
+                SELECT json_agg(playlists.id)
+                FROM playlists
+                INNER JOIN playlists_tracks ON playlists_tracks.playlist_id = playlists.id
+                WHERE playlists_tracks.track_id = t.id
+                GROUP BY playlists_tracks.track_id
+            ) AS playlist_ids_json,
+            (
+                SELECT json_agg(users.id)
+                FROM users
+                INNER JOIN playlists ON playlists.user_id = users.id
+                INNER JOIN playlists_tracks ON playlists_tracks.playlist_id = playlists.id
+                WHERE playlists_tracks.track_id = t.id
+                GROUP BY playlists_tracks.track_id
+            ) AS owner_ids_json,
+            (
+                SELECT json_agg(playlists_tracks.added_at)
+                FROM playlists_tracks
+                WHERE playlists_tracks.track_id = t.id
+                GROUP BY playlists_tracks.track_id
+            ) AS added_ats_json
+            FROM tracks t
+            INNER JOIN playlists_tracks ON playlists_tracks.track_id = t.id
+            INNER JOIN playlists ON playlists.id = playlists_tracks.playlist_id
+            INNER JOIN users ON users.id = playlists.user_id
             WHERE ` + strings.Join(filters, " AND ") + `
-            ORDER BY tracks.added_at DESC`
+            GROUP BY t.id, playlists_tracks.added_at
+            ORDER BY playlists_tracks.added_at DESC`
 
     return q
 }
@@ -57,70 +78,66 @@ func (ts *TrackStore) Search(params TracksSearchParams) ([]model.Track, error) {
     var tracks []model.Track
     nstmt, err := ts.DB.PrepareNamed(q)
     if err != nil {
-        return []model.Track{}, err
+        return tracks, err
     }
     err = nstmt.Select(&tracks, params)
     if err != nil {
-        return []model.Track{}, err
+        return tracks, err
     }
 
     return tracks, nil
 }
 
-// GetBySpotifyID - gets a row in tracks by Spotify ID
-func (ts *TrackStore) GetBySpotifyID(id string) (model.Track, error) {
-	q := `SELECT * FROM tracks WHERE spotify_id = $1`
+// GetBySpotifyIDIfExists - get a row from tracks by Spotify ID if it exists
+func (ts *TrackStore) GetBySpotifyIDIfExists(id string) (*model.Track, error) {
+    q := `SELECT EXISTS (SELECT 1 FROM tracks WHERE spotify_id = $1)`
 
-	var track model.Track
-	if err := ts.DB.QueryRowx(q, id).StructScan(&track); err != nil {
-		return model.Track{}, err
-	}
+    var exists bool
+    if err := ts.DB.QueryRowx(q, id).Scan(&exists); err != nil {
+        return nil, err
+    }
+    if !exists {
+        return nil, nil
+    }
 
-	return track, nil
+    q = `SELECT * FROM tracks WHERE spotify_id = $1`
+
+    track := &model.Track{}
+    if err := ts.DB.QueryRowx(q, id).StructScan(track); err != nil {
+        return nil, err
+    }
+
+    return track, nil
 }
 
 // Create - insert a row into tracks
-func (ts *TrackStore) Create(t model.Track) (model.Track, error) {
+func (ts *TrackStore) Create(t model.Track) (*model.Track, error) {
 	q := `INSERT INTO tracks (
 			name,
 			popularity,
             duration,
-            added_at,
             spotify_uri,
 			spotify_url,
 			spotify_id,
             artists_json,
             album_json
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING *`
 
-	var track model.Track
+	track := &model.Track{}
 	if err := ts.DB.QueryRowx(
 		q,
 		t.Name,
 		t.Popularity,
         t.Duration,
-        t.AddedAt,
         t.SpotifyURI,
 		t.SpotifyURL,
 		t.SpotifyID,
         t.Artists,
         t.Album,
-	).StructScan(&track); err != nil {
-		return model.Track{}, err
+	).StructScan(track); err != nil {
+		return nil, err
 	}
 
 	return track, nil
-}
-
-// CheckExistsBySpotifyID - check if a row in tracks exists by Spotify ID
-func (ts *TrackStore) CheckExistsBySpotifyID(id string) (bool, error) {
-	q := `SELECT EXISTS (SELECT 1 FROM tracks WHERE spotify_id = $1)`
-
-	var exists bool
-	if err := ts.DB.QueryRowx(q, id).Scan(&exists); err != nil {
-		return false, err
-	}
-
-	return exists, nil
 }

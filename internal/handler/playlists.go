@@ -8,6 +8,7 @@ import (
 
 	"github.com/JoshLampen/fiddle/api/db"
 	"github.com/JoshLampen/fiddle/api/db/model"
+	jsonWriter "github.com/JoshLampen/fiddle/api/internal/utils/json"
 )
 
 // PlaylistsCreate is an HTTP handler for inserting an array of playlists into the database
@@ -17,31 +18,36 @@ func PlaylistsCreate(w http.ResponseWriter, r *http.Request, store *db.Store) {
 	// Read the request
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		fmt.Println("handler.PlaylistsCreate - failed to read request body:", err)
+        err := fmt.Errorf("Failed to read request: %w", err)
+        jsonWriter.WriteError(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	var playlists model.Playlists
 	if err := json.Unmarshal(body, &playlists); err != nil {
-		fmt.Println("handler.PlaylistsCreate - failed to unmarshal request body:", err)
+        err := fmt.Errorf("Failed to process request: %w", err)
+        jsonWriter.WriteError(w, err, http.StatusInternalServerError)
 		return
 	}
 
+    // Delete any previous playlists belonging to the user
+    err = store.PlaylistStore.DeleteByUserID(playlists.UserID)
+    if err != nil {
+        err := fmt.Errorf("Failed to clear playlists before creating: %w", err)
+        jsonWriter.WriteError(w, err, http.StatusInternalServerError)
+        return
+    }
+
 	// Insert into database
 	for i, playlist := range playlists.Items {
-		result, err := store.PlaylistStore.Create(playlist, playlists.UserID)
+        result, err := store.PlaylistStore.Create(playlist, playlists.UserID)
 		if err != nil {
-			fmt.Println("handler.PlaylistsCreate - failed to create playlist:", err)
+            err := fmt.Errorf("Failed to create playlist: %w", err)
+            jsonWriter.WriteError(w, err, http.StatusInternalServerError)
 			return
 		}
 		playlists.Items[i].ID = result.ID
 	}
 
-	// Send a response
-	jsonBody, err := json.Marshal(playlists)
-	if err != nil {
-		fmt.Println("handler.PlaylistsCreate - failed to marshal response body:", err)
-		return
-	}
-	w.Write(jsonBody)
+    jsonWriter.WriteResponse(w, playlists)
 }

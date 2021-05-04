@@ -41,3 +41,15 @@ func (ps *PlaylistStore) Create(p model.Playlist, userID string) (model.Playlist
 
 	return playlist, nil
 }
+
+// DeleteByUserID - delete all rows from playlists for a user ID
+func (ps *PlaylistStore) DeleteByUserID(id string) (error) {
+    q := `DELETE FROM playlists WHERE user_id = $1`
+
+    _, err := ps.DB.Exec(q, id)
+    if err != nil {
+        return err
+    }
+
+    return nil
+}

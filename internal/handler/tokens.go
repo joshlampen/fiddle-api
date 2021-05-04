@@ -9,6 +9,7 @@ import (
 	"github.com/JoshLampen/fiddle/api/db"
 	"github.com/JoshLampen/fiddle/api/db/model"
 	"github.com/JoshLampen/fiddle/api/internal/constant"
+	jsonWriter "github.com/JoshLampen/fiddle/api/internal/utils/json"
 )
 
 func TokensGet(w http.ResponseWriter, r *http.Request, store *db.Store) {
@@ -20,17 +21,12 @@ func TokensGet(w http.ResponseWriter, r *http.Request, store *db.Store) {
     // Get from database
     token, err := store.TokenStore.GetByID(authID)
     if err != nil {
-        fmt.Println("handler.TokensGet - failed to get token from database:", err)
+        err := fmt.Errorf("Failed to get token from database: %w", err)
+        jsonWriter.WriteError(w, err, http.StatusInternalServerError)
         return
     }
 
-    // Send a response
-	jsonBody, err := json.Marshal(token)
-	if err != nil {
-		fmt.Println("handler.TokensGet - failed to marshal response body:", err)
-		return
-	}
-	w.Write(jsonBody)
+    jsonWriter.WriteResponse(w, token)
 }
 
 // TokensCreate is an HTTP handler for inserting a token into the database

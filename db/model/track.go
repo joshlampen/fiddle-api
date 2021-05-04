@@ -1,9 +1,14 @@
 package model
 
-import "github.com/jmoiron/sqlx/types"
+import (
+	"encoding/json"
+
+	"github.com/jmoiron/sqlx/types"
+)
 
 // Tracks is a slice of tracks received from spotify-api
 type Tracks struct {
+    PlaylistID string `json:"playlist_id"`
     Items []Track `json:"items"`
 }
 
@@ -20,7 +25,58 @@ type Track struct {
     Artists types.JSONText `json:"artists" db:"artists_json"`
     Album types.JSONText `json:"album" db:"album_json"`
 	CreatedAt string `json:"created_at,omitempty" db:"created_at"`
-    PlaylistName string `json:"playlist_name" db:"playlist_name"`
-    PlaylistSpotifyURL string `json:"playlist_spotify_url" db:"playlist_spotify_url"`
-	PlaylistID string `json:"playlist_id,omitempty"`
+    PlaylistIDs []string `json:"playlist_ids"`
+    OwnerIDs []string `json:"owner_ids"`
+    AddedAts []string `json:"added_ats"`
+
+    PlaylistIDsByteArray []byte `db:"playlist_ids_json"`
+    OwnerIDsByteArray []byte `db:"owner_ids_json"`
+    AddedAtsByteArray []byte `db:"added_ats_json"`
+}
+
+func MapGetTracksResponse(tracks []Track) ([]Track, error) {
+    var resp []Track
+
+    for _, track := range tracks {
+        var respItem Track
+        respItem.ID = track.ID
+        respItem.Name = track.Name
+        respItem.Popularity = track.Popularity
+        respItem.Duration = track.Duration
+        respItem.SpotifyURI = track.SpotifyURI
+        respItem.Artists = track.Artists
+        respItem.Album = track.Album
+
+        playlistIDs, err := marshalBytesToStrings(track.PlaylistIDsByteArray)
+        if err != nil {
+            return tracks, err
+        }
+        respItem.PlaylistIDs = playlistIDs
+
+        ownerIDs, err := marshalBytesToStrings(track.OwnerIDsByteArray)
+        if err != nil {
+            return tracks, err
+        }
+        respItem.OwnerIDs = ownerIDs
+
+        addedAts, err := marshalBytesToStrings(track.AddedAtsByteArray)
+        if err != nil {
+            return tracks, err
+        }
+        respItem.AddedAts = addedAts
+
+        resp = append(resp, respItem)
+    }
+
+    return resp, nil
+}
+
+func marshalBytesToStrings(bytes []byte) ([]string, error) {
+    var resp []string
+
+    if err := json.Unmarshal(bytes, &resp); err != nil {
+        return resp, err
+    }
+
+    return resp, nil
 }

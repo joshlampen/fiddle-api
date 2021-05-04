@@ -8,6 +8,7 @@ type User struct {
 	SpotifyURL string `json:"spotify_url" db:"spotify_url"`
 	SpotifyImageURL string `json:"spotify_image_url" db:"spotify_image_url"`
 	SpotifyID string `json:"spotify_id" db:"spotify_id"`
+    AuthID string `json:"auth_id" db:"auth_id"`
     Token string `json:"token" db:"token"`
 	CreatedAt string `json:"created_at" db:"created_at"`
 }

@@ -15,11 +15,12 @@ func NewPlaylistTrackStore(db *sqlx.DB) *PlaylistTrackStore {
 }
 
 // Create - insert a row into playlists_tracks
-func (pts *PlaylistTrackStore) Create(playlistID, trackID string) (string, error) {
+func (pts *PlaylistTrackStore) Create(playlistID, trackID, addedAt string) (string, error) {
 	q := `INSERT INTO playlists_tracks (
 			playlist_id,
-			track_id
-		) VALUES ($1, $2)
+			track_id,
+            added_at
+		) VALUES ($1, $2, $3)
 		RETURNING playlist_id`
 
 	var id []uint8
@@ -27,6 +28,7 @@ func (pts *PlaylistTrackStore) Create(playlistID, trackID string) (string, error
 		q,
 		playlistID,
 		trackID,
+        addedAt,
 	).Scan(&id); err != nil {
 		return "", err
 	}
@@ -49,4 +51,16 @@ func (pts *PlaylistTrackStore) CheckExistsByPlaylistIDTrackID(playlistID, trackI
 	}
 
 	return exists, nil
+}
+
+// DeleteByUserID - delete all rows from playlists_tracks for a playlist ID
+func (pts *PlaylistTrackStore) DeleteByPlaylistID(id string) (error) {
+    q := `DELETE FROM playlists_tracks WHERE playlist_id = $1`
+
+    _, err := pts.DB.Exec(q, id)
+    if err != nil {
+        return err
+    }
+
+    return nil
 }

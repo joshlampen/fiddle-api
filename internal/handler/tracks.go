@@ -8,6 +8,7 @@ import (
 
 	"github.com/JoshLampen/fiddle/api/db"
 	"github.com/JoshLampen/fiddle/api/db/model"
+	jsonWriter "github.com/JoshLampen/fiddle/api/internal/utils/json"
 )
 
 func TracksSearch(w http.ResponseWriter, r *http.Request, store *db.Store) {
@@ -26,17 +27,21 @@ func TracksSearch(w http.ResponseWriter, r *http.Request, store *db.Store) {
     // Retrieve from database
     tracks, err := store.TrackStore.Search(params)
     if err != nil {
-        fmt.Println("handler.TracksSearch - failed to get tracks:", err)
+        err := fmt.Errorf("Failed to get tracks: %w", err)
+        jsonWriter.WriteError(w, err, http.StatusInternalServerError)
         return
     }
 
-    // Send a response
-	jsonBody, err := json.Marshal(tracks)
-	if err != nil {
-		fmt.Println("handler.TracksSearch - failed to marshal response body:", err)
-		return
-	}
-	w.Write(jsonBody)
+    resp, err := model.MapGetTracksResponse(tracks)
+    if err != nil {
+        err := fmt.Errorf("Failed to prepare response: %w", err)
+        jsonWriter.WriteError(w, err, http.StatusInternalServerError)
+        return
+    }
+
+    fmt.Printf("%+v\n", resp)
+
+    jsonWriter.WriteResponse(w, resp)
 }
 
 // TracksCreate is an HTTP handler for inserting an array of tracks into the database
@@ -45,66 +50,65 @@ func TracksCreate(w http.ResponseWriter, r *http.Request, store *db.Store) {
 	// Read the request
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		fmt.Println("handler.TracksCreate - failed to read request body:", err)
+        err := fmt.Errorf("Failed to read request: %w", err)
+        jsonWriter.WriteError(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	var tracks model.Tracks
 	if err := json.Unmarshal(body, &tracks); err != nil {
-		fmt.Println("handler.TracksCreate - failed to unmarshal request body:", err)
+        err := fmt.Errorf("Failed to process request: %w", err)
+        jsonWriter.WriteError(w, err, http.StatusInternalServerError)
 		return
 	}
+
+    // Delete any previous playlists_tracks relationships belonging to the playlist
+    err = store.PlaylistTrackStore.DeleteByPlaylistID(tracks.PlaylistID)
+    if err != nil {
+        err := fmt.Errorf("Failed to clear playlist tracks before creating: %w", err)
+        jsonWriter.WriteError(w, err, http.StatusInternalServerError)
+        return
+    }
 
 	// Insert into database
     var respBody model.Tracks
 	for _, item := range tracks.Items {
-        // Check if the track exists
-		tExists, err := store.TrackStore.CheckExistsBySpotifyID(item.SpotifyID)
-		if err != nil {
-			fmt.Println("handler.TracksCreate - failed to check if track exists:", err)
-			return
-		}
-
-		var track model.Track
-		if tExists {
-			result, err := store.TrackStore.GetBySpotifyID(item.SpotifyID)
+        // Use track from the database if it exists
+        track, err := store.TrackStore.GetBySpotifyIDIfExists(item.SpotifyID)
+        if err != nil {
+            err := fmt.Errorf("Failed to get track: %w", err)
+            jsonWriter.WriteError(w, err, http.StatusInternalServerError)
+            return
+        }
+        if track == nil {
+            // Insert into database
+			track, err = store.TrackStore.Create(item)
 			if err != nil {
-				fmt.Println("handler.TracksCreate - failed to get track:", err)
+                err := fmt.Errorf("Failed to create track: %w", err)
+                jsonWriter.WriteError(w, err, http.StatusInternalServerError)
 				return
 			}
-			track = result
-		} else {
-			result, err := store.TrackStore.Create(item)
-			if err != nil {
-				fmt.Println("handler.TracksCreate - failed to create track:", err)
-				return
-			}
-			track = result
-            respBody.Items = append(respBody.Items, track)
-		}
+        }
+        respBody.Items = append(respBody.Items, *track)
 
         // Check if the playlists_tracks relationship exists
         // (avoiding track duplicates in playlists)
-        ptExists, err := store.PlaylistTrackStore.CheckExistsByPlaylistIDTrackID(item.PlaylistID, track.ID)
+        ptExists, err := store.PlaylistTrackStore.CheckExistsByPlaylistIDTrackID(tracks.PlaylistID, track.ID)
         if err != nil {
-			fmt.Println("handler.TracksCreate - failed to check if playlists_tracks relationship exists:", err)
+            err := fmt.Errorf("Failed to check playlist: %w", err)
+            jsonWriter.WriteError(w, err, http.StatusInternalServerError)
 			return
 		}
 
         if !ptExists {
-            _, err = store.PlaylistTrackStore.Create(item.PlaylistID, track.ID)
+            _, err = store.PlaylistTrackStore.Create(tracks.PlaylistID, track.ID, item.AddedAt)
             if err != nil {
-                fmt.Println("handler.TracksCreate - failed to create playlists_tracks relationship:", err)
+                err := fmt.Errorf("Failed to create tracks in playlist: %w", err)
+                jsonWriter.WriteError(w, err, http.StatusInternalServerError)
                 return
             }
         }
 	}
 
-    // Send a response
-	jsonBody, err := json.Marshal(respBody)
-	if err != nil {
-		fmt.Println("handler.TracksCreate - failed to marshal response body:", err)
-		return
-	}
-	w.Write(jsonBody)
+    jsonWriter.WriteResponse(w, respBody)
 }

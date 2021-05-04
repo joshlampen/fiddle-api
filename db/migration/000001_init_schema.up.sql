@@ -18,6 +18,7 @@ CREATE TABLE users (
     spotify_url TEXT NOT NULL,
     spotify_image_url TEXT NOT NULL,
     spotify_id TEXT NOT NULL,
+    auth_id TEXT NOT NULL,
     token TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
 
@@ -44,7 +45,6 @@ CREATE TABLE tracks (
     name TEXT NOT NULL,
     popularity INT NOT NULL,
     duration INT NOT NULL,
-    added_at TEXT NOT NULL,
     spotify_uri TEXT NOT NULL,
     spotify_url TEXT NOT NULL,
     spotify_id TEXT NOT NULL,
@@ -58,6 +58,7 @@ CREATE TABLE tracks (
 CREATE TABLE playlists_tracks (
     playlist_id UUID NOT NULL,
     track_id UUID NOT NULL,
+    added_at TEXT NOT NULL,
 
     PRIMARY KEY(playlist_id, track_id),
     CONSTRAINT fk_playlist_id FOREIGN KEY (playlist_id)

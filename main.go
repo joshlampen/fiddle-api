@@ -31,7 +31,9 @@ func main() {
 	r.HandleFunc("/tokens", func(w http.ResponseWriter, r *http.Request) { handler.TokensGet(w, r, store) }).Methods("GET", "OPTIONS")
 	r.HandleFunc("/tokens", func(w http.ResponseWriter, r *http.Request) { handler.TokensCreate(w, r, store) }).Methods("POST", "OPTIONS")
 
+	r.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) { handler.UsersGet(w, r, store) }).Methods("GET", "OPTIONS")
 	r.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) { handler.UsersCreate(w, r, store) }).Methods("POST", "OPTIONS")
+
 	r.HandleFunc("/playlists", func(w http.ResponseWriter, r *http.Request) { handler.PlaylistsCreate(w, r, store) }).Methods("POST", "OPTIONS")
 
 	r.HandleFunc("/tracks", func(w http.ResponseWriter, r *http.Request) { handler.TracksSearch(w, r, store) }).Methods("GET", "OPTIONS")
