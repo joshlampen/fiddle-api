@@ -8,6 +8,7 @@ import (
 
 	"github.com/JoshLampen/fiddle/api/db"
 	"github.com/JoshLampen/fiddle/api/db/model"
+	"github.com/JoshLampen/fiddle/api/internal/constant"
 	jsonWriter "github.com/JoshLampen/fiddle/api/internal/utils/json"
 )
 
@@ -20,8 +21,8 @@ func TracksSearch(w http.ResponseWriter, r *http.Request, store *db.Store) {
     // Read the request
     var params db.TracksSearchParams
 
-    if r.FormValue("user_id") != "" {
-        params.UserID = r.FormValue("user_id")
+    if r.FormValue(constant.URLParamUserID) != "" {
+        params.UserID = r.FormValue(constant.URLParamUserID)
     }
 
     // Retrieve from database
@@ -34,12 +35,10 @@ func TracksSearch(w http.ResponseWriter, r *http.Request, store *db.Store) {
 
     resp, err := model.MapGetTracksResponse(tracks)
     if err != nil {
-        err := fmt.Errorf("Failed to prepare response: %w", err)
+        err := fmt.Errorf("Failed to prepare tracks response: %w", err)
         jsonWriter.WriteError(w, err, http.StatusInternalServerError)
         return
     }
-
-    fmt.Printf("%+v\n", resp)
 
     jsonWriter.WriteResponse(w, resp)
 }
@@ -50,14 +49,14 @@ func TracksCreate(w http.ResponseWriter, r *http.Request, store *db.Store) {
 	// Read the request
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-        err := fmt.Errorf("Failed to read request: %w", err)
+        err := fmt.Errorf("Failed to read tracks request: %w", err)
         jsonWriter.WriteError(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	var tracks model.Tracks
 	if err := json.Unmarshal(body, &tracks); err != nil {
-        err := fmt.Errorf("Failed to process request: %w", err)
+        err := fmt.Errorf("Failed to process tracks request: %w", err)
         jsonWriter.WriteError(w, err, http.StatusInternalServerError)
 		return
 	}

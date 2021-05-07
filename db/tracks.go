@@ -6,6 +6,7 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"github.com/JoshLampen/fiddle/api/db/model"
+	"github.com/JoshLampen/fiddle/api/internal/utils/logger"
 )
 
 // TrackStore manages the tracks database entity
@@ -33,55 +34,74 @@ func (p TracksSearchParams) String() string {
         "t.album_json AS album_json",
     }
 
-    var filters []string
-    if p.UserID != "" {
-        filters = append(filters, `playlists.user_id = :user_id`)
-    }
+    // var filters []string
+    // if p.UserID != "" {
+    //     filters = append(filters, `playlists.user_id = :user_id`)
+    // }
 
     q := `SELECT ` + strings.Join(fields, ", ") + `,
             (
-                SELECT json_agg(playlists.id)
+                SELECT playlists_tracks.added_at
+                FROM playlists_tracks
+                WHERE playlists_tracks.track_id = t.id
+                ORDER BY playlists_tracks.added_at DESC
+                LIMIT 1
+            ) AS added_at,
+            (
+                SELECT jsonb_agg(playlists.id ORDER BY playlists_tracks.added_at ASC)
                 FROM playlists
                 INNER JOIN playlists_tracks ON playlists_tracks.playlist_id = playlists.id
                 WHERE playlists_tracks.track_id = t.id
                 GROUP BY playlists_tracks.track_id
             ) AS playlist_ids_json,
             (
-                SELECT json_agg(users.id)
+                SELECT jsonb_agg(users.id ORDER BY playlists_tracks.added_at ASC)
                 FROM users
                 INNER JOIN playlists ON playlists.user_id = users.id
                 INNER JOIN playlists_tracks ON playlists_tracks.playlist_id = playlists.id
                 WHERE playlists_tracks.track_id = t.id
                 GROUP BY playlists_tracks.track_id
-            ) AS owner_ids_json,
-            (
-                SELECT json_agg(playlists_tracks.added_at)
-                FROM playlists_tracks
-                WHERE playlists_tracks.track_id = t.id
-                GROUP BY playlists_tracks.track_id
-            ) AS added_ats_json
-            FROM tracks t
-            INNER JOIN playlists_tracks ON playlists_tracks.track_id = t.id
-            INNER JOIN playlists ON playlists.id = playlists_tracks.playlist_id
-            INNER JOIN users ON users.id = playlists.user_id
-            WHERE ` + strings.Join(filters, " AND ") + `
-            GROUP BY t.id, playlists_tracks.added_at
-            ORDER BY playlists_tracks.added_at DESC`
+            ) AS owner_ids_json
+            FROM (
+                SELECT t1.*
+                FROM tracks t1
+                INNER JOIN playlists_tracks ON playlists_tracks.track_id = t1.id
+                INNER JOIN playlists ON playlists.id = playlists_tracks.playlist_id
+                INNER JOIN users ON users.id = playlists.user_id
+                WHERE users.id = :user_id
+                UNION
+                SELECT t2.*
+                FROM tracks t2
+                INNER JOIN playlists_tracks ON playlists_tracks.track_id = t2.id
+                INNER JOIN playlists ON playlists.id = playlists_tracks.playlist_id
+                INNER JOIN users ON users.id = playlists.user_id
+                INNER JOIN friendships ON friendships.friend_id = playlists.user_id
+                WHERE friendships.user_id = :user_id
+                AND friendships.pending = false
+            ) AS t
+            GROUP BY t.id, t.name, t.duration, t.spotify_uri, t.spotify_url, t.artists_json, t.album_json
+            ORDER BY added_at DESC`
+
+            // WHERE ` + strings.Join(filters, " AND ") + `
 
     return q
 }
 
 // Search - gets row(s) in tracks based on search params
 func (ts *TrackStore) Search(params TracksSearchParams) ([]model.Track, error) {
+    logger := logger.NewLogger()
+
     q := params.String()
 
     var tracks []model.Track
     nstmt, err := ts.DB.PrepareNamed(q)
     if err != nil {
+        logger.Error().Err(err).Msg("TrackStore.Search - failed to prepare named statement")
         return tracks, err
     }
     err = nstmt.Select(&tracks, params)
     if err != nil {
+        logger.Error().Err(err).Msg("TrackStore.Search - failed to get tracks")
         return tracks, err
     }
 
@@ -90,10 +110,16 @@ func (ts *TrackStore) Search(params TracksSearchParams) ([]model.Track, error) {
 
 // GetBySpotifyIDIfExists - get a row from tracks by Spotify ID if it exists
 func (ts *TrackStore) GetBySpotifyIDIfExists(id string) (*model.Track, error) {
+    logger := logger.NewLogger()
+
     q := `SELECT EXISTS (SELECT 1 FROM tracks WHERE spotify_id = $1)`
 
     var exists bool
     if err := ts.DB.QueryRowx(q, id).Scan(&exists); err != nil {
+        logger.Error().
+            Err(err).
+            Str("spotifyID", id).
+            Msg("TrackStore.GetBySpotifyIDIfExists - failed to check if track exists")
         return nil, err
     }
     if !exists {
@@ -104,6 +130,10 @@ func (ts *TrackStore) GetBySpotifyIDIfExists(id string) (*model.Track, error) {
 
     track := &model.Track{}
     if err := ts.DB.QueryRowx(q, id).StructScan(track); err != nil {
+        logger.Error().
+            Err(err).
+            Str("spotifyID", id).
+            Msg("TrackStore.GetBySpotifyIDIfExists - failed to get track")
         return nil, err
     }
 
@@ -112,6 +142,8 @@ func (ts *TrackStore) GetBySpotifyIDIfExists(id string) (*model.Track, error) {
 
 // Create - insert a row into tracks
 func (ts *TrackStore) Create(t model.Track) (*model.Track, error) {
+    logger := logger.NewLogger()
+
 	q := `INSERT INTO tracks (
 			name,
 			popularity,
@@ -136,6 +168,10 @@ func (ts *TrackStore) Create(t model.Track) (*model.Track, error) {
         t.Artists,
         t.Album,
 	).StructScan(track); err != nil {
+        logger.Error().
+            Err(err).
+            Str("trackID", t.ID).
+            Msg("TrackStore.Create - failed to create track")
 		return nil, err
 	}
 

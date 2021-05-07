@@ -30,6 +30,23 @@ func UsersGet(w http.ResponseWriter, r *http.Request, store *db.Store) {
     jsonWriter.WriteResponse(w, user)
 }
 
+func UsersGetFriends(w http.ResponseWriter, r *http.Request, store *db.Store) {
+    w.Header().Set("Content-Type", "application/json")
+    w.Header().Set("Access-Control-Allow-Origin", "*")
+    w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS")
+
+    userID := r.URL.Query().Get(constant.URLParamUserID)
+
+    friends, err := store.UserStore.GetFriendsByUserID(userID)
+    if err != nil {
+        err := fmt.Errorf("Failed to get friends: %w", err)
+        jsonWriter.WriteError(w, err, http.StatusInternalServerError)
+        return
+    }
+
+    jsonWriter.WriteResponse(w, friends)
+}
+
 // UsersCreate is an HTTP handler for inserting a user into the database
 func UsersCreate(w http.ResponseWriter, r *http.Request, store *db.Store) {
     w.Header().Set("Content-Type", "application/json")
@@ -37,14 +54,14 @@ func UsersCreate(w http.ResponseWriter, r *http.Request, store *db.Store) {
 	// Read the request
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-        err := fmt.Errorf("Failed to read request: %w", err)
+        err := fmt.Errorf("Failed to read user request: %w", err)
         jsonWriter.WriteError(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	var user model.User
 	if err := json.Unmarshal(body, &user); err != nil {
-        err := fmt.Errorf("Failed to process request: %w", err)
+        err := fmt.Errorf("Failed to process user request: %w", err)
         jsonWriter.WriteError(w, err, http.StatusInternalServerError)
 		return
 	}

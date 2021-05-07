@@ -8,30 +8,28 @@ import (
 
 // Tracks is a slice of tracks received from spotify-api
 type Tracks struct {
-    PlaylistID string `json:"playlist_id"`
-    Items []Track `json:"items"`
+    PlaylistID string  `json:"playlist_id"`
+    Items      []Track `json:"items"`
 }
 
 // Track is a representation of a row in the tracks entity
 type Track struct {
-	ID string `json:"id" db:"id"`
-	Name string `json:"name" db:"name"`
-	Popularity int `json:"popularity,omitempty" db:"popularity"`
-    Duration int `json:"duration_ms" db:"duration"`
-    AddedAt string `json:"added_at" db:"added_at"`
-    SpotifyURI string `json:"spotify_uri" db:"spotify_uri"`
-	SpotifyURL string `json:"spotify_url" db:"spotify_url"`
-	SpotifyID string `json:"spotify_id,omitempty" db:"spotify_id"`
-    Artists types.JSONText `json:"artists" db:"artists_json"`
-    Album types.JSONText `json:"album" db:"album_json"`
-	CreatedAt string `json:"created_at,omitempty" db:"created_at"`
-    PlaylistIDs []string `json:"playlist_ids"`
-    OwnerIDs []string `json:"owner_ids"`
-    AddedAts []string `json:"added_ats"`
+	ID          string         `json:"id" db:"id"`
+	Name        string         `json:"name" db:"name"`
+	Popularity  int            `json:"popularity,omitempty" db:"popularity"`
+    Duration    int            `json:"duration_ms" db:"duration"`
+    AddedAt     string         `json:"added_at" db:"added_at"`
+    SpotifyURI  string         `json:"spotify_uri" db:"spotify_uri"`
+	SpotifyURL  string         `json:"spotify_url,omitempty" db:"spotify_url"`
+	SpotifyID   string         `json:"spotify_id,omitempty" db:"spotify_id"`
+    Artists     types.JSONText `json:"artists" db:"artists_json"`
+    Album       types.JSONText `json:"album" db:"album_json"`
+	CreatedAt   string         `json:"created_at,omitempty" db:"created_at"`
+    PlaylistIDs []string       `json:"playlist_ids"`
+    OwnerIDs    []string       `json:"owner_ids"`
 
-    PlaylistIDsByteArray []byte `db:"playlist_ids_json"`
-    OwnerIDsByteArray []byte `db:"owner_ids_json"`
-    AddedAtsByteArray []byte `db:"added_ats_json"`
+    PlaylistIDsByteArray []byte `json:"playlist_ids_json,omitempty" db:"playlist_ids_json"`
+    OwnerIDsByteArray    []byte `json:"owner_ids_json,omitempty" db:"owner_ids_json"`
 }
 
 func MapGetTracksResponse(tracks []Track) ([]Track, error) {
@@ -43,6 +41,7 @@ func MapGetTracksResponse(tracks []Track) ([]Track, error) {
         respItem.Name = track.Name
         respItem.Popularity = track.Popularity
         respItem.Duration = track.Duration
+        respItem.AddedAt = track.AddedAt
         respItem.SpotifyURI = track.SpotifyURI
         respItem.Artists = track.Artists
         respItem.Album = track.Album
@@ -58,12 +57,6 @@ func MapGetTracksResponse(tracks []Track) ([]Track, error) {
             return tracks, err
         }
         respItem.OwnerIDs = ownerIDs
-
-        addedAts, err := marshalBytesToStrings(track.AddedAtsByteArray)
-        if err != nil {
-            return tracks, err
-        }
-        respItem.AddedAts = addedAts
 
         resp = append(resp, respItem)
     }

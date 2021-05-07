@@ -34,20 +34,23 @@ func TokensCreate(w http.ResponseWriter, r *http.Request, store *db.Store) {
 	// Read the request
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		fmt.Println("handler.TokensCreate - failed to read request body:", err)
+        err := fmt.Errorf("Failed to read token request: %w", err)
+		jsonWriter.WriteError(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	var token model.Token
 	if err := json.Unmarshal(body, &token); err != nil {
-		fmt.Println("handler.TokensCreate - failed to unmarshal request body:", err)
+        err := fmt.Errorf("Failed to process token request: %w", err)
+		jsonWriter.WriteError(w, err, http.StatusInternalServerError)
 		return
 	}
 
     // Insert into database
     _, err = store.TokenStore.Create(token)
     if err != nil {
-        fmt.Println("handler.TokensCreate - failed to create token:", err)
+        err := fmt.Errorf("Failed to create token: %w", err)
+		jsonWriter.WriteError(w, err, http.StatusInternalServerError)
         return
     }
 }

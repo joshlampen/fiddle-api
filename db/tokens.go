@@ -4,6 +4,7 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"github.com/JoshLampen/fiddle/api/db/model"
+	"github.com/JoshLampen/fiddle/api/internal/utils/logger"
 )
 
 // TokenStore manages the auth_codes database entity
@@ -18,10 +19,16 @@ func NewTokenStore(db *sqlx.DB) *TokenStore {
 
 // GetByID - gets a row in auth_codes by ID
 func (ts *TokenStore) GetByID(id string) (model.Token, error) {
+    logger := logger.NewLogger()
+
     q := `SELECT * FROM tokens WHERE id = $1`
 
 	var token model.Token
 	if err := ts.DB.QueryRowx(q, id).StructScan(&token); err != nil {
+        logger.Error().
+            Err(err).
+            Str("id", id).
+            Msg("TokenStore.GetByID - failed to get token")
 		return model.Token{}, err
 	}
 
@@ -30,6 +37,8 @@ func (ts *TokenStore) GetByID(id string) (model.Token, error) {
 
 // Create - insert a row into auth_codes
 func (ts *TokenStore) Create(t model.Token) (model.Token, error) {
+    logger := logger.NewLogger()
+
 	q := `INSERT INTO tokens (
 			id,
 			access_token,
@@ -50,6 +59,10 @@ func (ts *TokenStore) Create(t model.Token) (model.Token, error) {
         t.ExpiresIn,
         t.RefreshToken,
 	).StructScan(&token); err != nil {
+        logger.Error().
+            Err(err).
+            Str("id", t.ID).
+            Msg("TokenStore.Create - failed to create token")
 		return model.Token{}, err
 	}
 
